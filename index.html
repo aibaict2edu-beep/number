@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>C言語 行番号つけ</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -116,20 +116,12 @@
         <h2 id="step4-title">実行して結果を見る（簡易版）</h2>
       </div>
 
-      <div class="run-top">
-        <div class="run-input">
-          <label for="stdinText">キーボードから入力する値（scanf などが読み込む値）</label>
-          <textarea id="stdinText" rows="3" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"
-            placeholder="例）&#10;10&#10;3.5&#10;（入力のいらないプログラムは空のままで構いません）"
-            aria-label="プログラムに入力する値"></textarea>
-        </div>
-        <div class="run-buttons">
-          <button type="button" class="btn-run" id="runBtn" disabled>▶ 実行する</button>
-          <label class="check"><input type="checkbox" id="echoCheck" checked> 入力した値も結果に表示する</label>
-        </div>
+      <div class="run-bar">
+        <button type="button" class="btn-run" id="runBtn" disabled>▶ 実行する</button>
+        <p class="run-help">scanf などで入力が必要になると、下の黒い画面の中に入力欄が出ます。値を入力して <strong>Enter</strong> を押してください。</p>
       </div>
 
-      <div class="result" id="result" tabindex="0" aria-label="実行結果" aria-live="polite"></div>
+      <div class="result" id="result" aria-label="実行結果" aria-live="polite"></div>
 
       <div class="copy-options result-copy">
         <div class="copy-option">
@@ -148,7 +140,7 @@
         <ul>
           <li><strong>動くもの</strong>：printf / scanf、変数、if・for・while・switch、配列、関数、ポインタ、文字列の関数（strlen・strcpy など）、math.h（sqrt・sin・cos・tan・pow など）</li>
           <li><strong>未対応</strong>：構造体（struct）、typedef、関数ポインタ、ファイル操作、引数つきの #define、可変個引数の関数</li>
-          <li><strong>本物のCとの違い</strong>：初期化していない変数は 0 になります（本物では不定）。rand() の値は本物とは違います。long は 4 バイトとして動きます。実行は 5 秒で打ち切り、再帰は 1000 回程度までです。</li>
+          <li><strong>本物のCとの違い</strong>：初期化していない変数は 0 になります（本物では不定）。rand() の値は本物とは違います（実行のたびに同じ値になります）。入力のたびにプログラムを最初から実行し直して結果を表示しています。long は 4 バイトとして動きます。実行は 5 秒で打ち切り、再帰は 1000 回程度までです。</li>
           <li>学習用の簡易版です。最終的な確認は、本物のコンパイラ（gcc など）で行ってください。</li>
         </ul>
       </details>
@@ -160,7 +152,7 @@
     🔒 貼り付けたコードは、お使いのブラウザの中だけで処理されます。サーバーには送信されません。
   </footer>
 
-  <script src="cinterp.js?v=3"></script>
-  <script src="script.js?v=3"></script>
+  <script src="cinterp.js?v=4"></script>
+  <script src="script.js?v=4"></script>
 </body>
 </html>

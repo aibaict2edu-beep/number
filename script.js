@@ -58,8 +58,6 @@ int main(void)
     step2: $("step2"),
     step3: $("step3"),
     step4: $("step4"),
-    stdin: $("stdinText"),
-    echo: $("echoCheck"),
     run: $("runBtn"),
     result: $("result"),
     copyResult: $("copyResultBtn"),
@@ -215,6 +213,8 @@ int main(void)
       : '<div class="placeholder">cinterp.js が読み込めないため、実行機能は使えません。</div>';
     els.copyResult.disabled = true;
     els.copyAll.disabled = true;
+    els.run.textContent = "▶ 実行する";
+    inputs = "";
     resetCopyFeedback2();
     const bad = els.output.querySelector(".line.err");
     if (bad) bad.classList.remove("err");
@@ -406,28 +406,44 @@ int main(void)
     els.copyStatus2.classList.remove("error");
   }
 
+  let inputs = "";          // これまでに入力された値（1回の入力ごとに末尾が改行）
+  let running = false;
+
   function showResult(res) {
     let html = "";
     const err = res.error;
     const out = res.output || "";
+    const waiting = !!res.needInput;
 
     if (err && res.phase !== "run") {
       html += `<div class="res-err"><strong>コンパイルエラー（実行できません）</strong>${
         err.line ? escapeHtml(String(err.line)) + " 行目：" : ""}${escapeHtml(err.message)}</div>`;
     } else {
-      html += out === ""
-        ? '<pre class="out muted">（出力はありません）</pre>'
-        : `<pre class="out">${escapeHtml(out)}</pre>`;
+      if (out === "" && !waiting) html += '<pre class="out muted">（出力はありません）</pre>';
+      else html += `<pre class="out">${escapeHtml(out)}<input type="text" class="term-in" id="termIn" ${waiting ? "" : "hidden"} autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="プログラムへの入力（入力したら Enter）"></pre>`;
+      if (waiting) html += '<div class="term-hint">↑ 値を入力して Enter を押してください。間違えたときは「最初から実行し直す」を押します。</div>';
       if (err) {
         html += `<div class="res-err"><strong>実行中にエラー${err.line ? "（" + escapeHtml(String(err.line)) + " 行目）" : ""}</strong>${escapeHtml(err.message)}</div>`;
       } else if (res.exitCode) {
         html += `<div class="res-meta">プログラムは終了コード ${escapeHtml(String(res.exitCode))} で終了しました。</div>`;
       }
-      if (res.eofHit && els.stdin.value.trim() === "") {
-        html += '<div class="res-note">入力欄が空でした。scanf などで値を読み込むプログラムは、上の入力欄に値を書いてから実行してください。</div>';
-      }
     }
     els.result.innerHTML = html;
+
+    if (waiting) {
+      const inp = $("termIn");
+      inp.size = 8;
+      inp.addEventListener("input", () => { inp.size = Math.max(8, inp.value.length + 1); });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.isComposing) {
+          e.preventDefault();
+          inputs += inp.value + "\n";
+          execute();
+        }
+      });
+      inp.focus({ preventScroll: true });
+      inp.scrollIntoView({ block: "nearest" });
+    }
 
     if (err && err.line) {
       const idx = err.line - state.start;
@@ -438,36 +454,50 @@ int main(void)
       }
     }
 
-    const copyable = res.phase === "run" && out !== "";
+    const copyable = res.phase === "run" && !waiting && out !== "";
     lastRun = copyable ? { output: out } : null;
     els.copyResult.disabled = !copyable;
     els.copyAll.disabled = !copyable;
   }
 
-  function runProgram() {
-    if (!state || !hasInterp) return;
-    clearResult();
+  // inputs を使って最初から実行する（入力が足りなくなったらそこで止まり、画面で入力を待つ）
+  function execute() {
+    if (!state || !hasInterp || running) return;
+    running = true;
+    const bad = els.output.querySelector(".line.err");
+    if (bad) bad.classList.remove("err");
     els.run.disabled = true;
-    els.run.textContent = "実行中…";
     const src = state.source;
     const start = state.start;
     setTimeout(() => {
       let res;
       try {
         res = globalThis.CInterp.run(src, {
-          input: els.stdin.value,
+          input: inputs,
           lineOffset: start - 1,
           timeLimitMs: 5000,
-          echoInput: els.echo.checked,
+          echoInput: true,
+          stopOnEof: true,
+          timeBase: runTime,
           longSize: 4,
         });
       } catch (e) {
         res = { output: "", exitCode: 1, phase: "run", error: { message: "内部エラーが起きました：" + (e && e.message ? e.message : e), line: 0 } };
       }
+      running = false;
       showResult(res);
-      els.run.textContent = "▶ 実行する";
+      els.run.textContent = "↺ 最初から実行し直す";
       els.run.disabled = false;
-    }, 30);
+    }, 20);
+  }
+
+  let runTime = Date.now();
+  function runProgram() {
+    if (!state || !hasInterp) return;
+    clearResult();
+    inputs = "";
+    runTime = Date.now();
+    execute();
   }
 
   const trimEndNl = (s) => s.replace(/\n+$/, "");
@@ -554,7 +584,6 @@ int main(void)
   els.run.addEventListener("click", runProgram);
   els.copyResult.addEventListener("click", () => onCopyResult("result"));
   els.copyAll.addEventListener("click", () => onCopyResult("all"));
-  els.echo.addEventListener("change", () => store.set("lineno-echo", els.echo.checked ? "1" : "0"));
 
   els.fontDown.addEventListener("click", () => setFontSize(fontSize - FONT_STEP));
   els.fontUp.addEventListener("click", () => setFontSize(fontSize + FONT_STEP));
@@ -566,6 +595,5 @@ int main(void)
   const savedFont = parseInt(store.get("lineno-font"), 10);
   setFontSize(Number.isFinite(savedFont) ? savedFont : FONT_DEFAULT);
   setTheme(store.get("lineno-theme") === "dark" ? "dark" : "light");
-  els.echo.checked = store.get("lineno-echo") !== "0";
   render();
 })();

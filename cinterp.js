@@ -1085,7 +1085,7 @@
       }
     }
     // 読み込む値の数に対して、入力が最後まで読み切られて足りなかった
-    if (inp === rt.stdin && count < ptrs.length && inp.pos >= inp.bytes.length) rt.eofHit = true;
+    if (inp === rt.stdin && count < ptrs.length && inp.pos >= inp.bytes.length) rt.needInput();
     return failedAtEof && count === 0 ? -1 : count;
   }
 
@@ -1102,6 +1102,7 @@
   const B = L.builtins;
 
   class ExitSignal { constructor(code) { this.code = code; } }
+  class NeedInput { }   // 入力待ち（画面で入力を受け付けるため、実行をいったん止める）
 
   const def = (name, ret, fn) => { B[name] = { ret, fn }; };
   const num = (v) => (typeof v === "bigint" ? Number(v) : v);
@@ -1163,7 +1164,7 @@
     const s = rt.stdin;
     rt.echoAt(s);
     if (s.pos < s.bytes.length) return s.bytes[s.pos++];
-    rt.eofHit = true;
+    rt.needInput();
     return -1;
   });
   B.getc = B.getchar;
@@ -1172,7 +1173,7 @@
     need(rt, a, 2, "fgets");
     const s = rt.stdin, buf = num(a[0]), n = num(a[1]);
     rt.echoAt(s);
-    if (n <= 0 || s.pos >= s.bytes.length) { rt.eofHit = true; return 0; }
+    if (n <= 0 || s.pos >= s.bytes.length) { rt.needInput(); return 0; }
     const bytes = [];
     while (bytes.length < n - 1 && s.pos < s.bytes.length) {
       const b = s.bytes[s.pos++];
@@ -1186,7 +1187,7 @@
     need(rt, a, 1, "gets");
     const s = rt.stdin, buf = num(a[0]);
     rt.echoAt(s);
-    if (s.pos >= s.bytes.length) { rt.eofHit = true; return 0; }
+    if (s.pos >= s.bytes.length) { rt.needInput(); return 0; }
     const bytes = [];
     while (s.pos < s.bytes.length) {
       const b = s.bytes[s.pos++];
@@ -1329,7 +1330,7 @@
     return (rt.randState >>> 16) & 0x7fff;
   });
   def("time", "int", (rt, a) => {
-    const now = Math.floor(Date.now() / 1000);
+    const now = Math.floor((rt.timeBase || Date.now()) / 1000);
     if (a.length > 0 && num(a[0]) !== 0) rt.store(num(a[0]), T.int, now | 0);
     return now | 0;
   });
@@ -1348,6 +1349,7 @@
   def("abort", "void", () => { throw new ExitSignal(134); });
 
   L.ExitSignal = ExitSignal;
+  L.NeedInput = NeedInput;
 })(globalThis);
 /* ===== C言語 簡易インタプリタ：実行環境（メモリ・変数・宣言） ===== */
 (function (g) {
@@ -1383,6 +1385,8 @@
       this.stdin = { bytes: Array.from(new TextEncoder().encode(opts.input || "")), pos: 0, echoed: 0 };
       this.echoInput = !!opts.echoInput;   // 入力した値を画面にも表示する（ターミナルの見た目）
       this.eofHit = false;                 // 入力が足りなかったか
+      this.stopOnEof = !!opts.stopOnEof;   // 入力が足りなくなったら、そこで実行を止める（画面で入力を待つため）
+      this.timeBase = opts.timeBase || 0;  // time() の値を固定したいときの基準（ミリ秒）
       this.steps = 0;
       this.depth = 0;
       this.line = 0;
@@ -1392,6 +1396,11 @@
       this.deadline = this.startTime + this.limitMs;
       this.randState = 1;
       this.inGlobal = true;
+    }
+
+    needInput() {
+      this.eofHit = true;
+      if (this.stopOnEof) throw new L.NeedInput();
     }
 
     err(msg) { return new CError(msg, this.line); }
@@ -1688,6 +1697,7 @@
     run() {
       let exitCode = 0;
       let error = null;
+      let needInput = false;
       try {
         for (const it of this.items) if (it.k === "func") this.funcs.set(it.name, it);
         this.line = 1;
@@ -1708,13 +1718,14 @@
         exitCode = Number(r) | 0;
       } catch (e) {
         if (e instanceof L.ExitSignal) exitCode = e.code;
+        else if (e instanceof L.NeedInput) { needInput = true; exitCode = null; }
         else if (e instanceof CError) error = { message: e.cMessage, line: e.line };
         else if (e instanceof RangeError && /call stack/i.test(e.message)) {
           error = { message: "再帰呼び出しが深すぎます（スタックオーバーフロー）", line: this.line };
         } else throw e;
       }
       const output = new TextDecoder("utf-8").decode(Uint8Array.from(this.out));
-      return { output, exitCode, error, eofHit: this.eofHit };
+      return { output, exitCode, error, eofHit: this.eofHit, needInput };
     }
   }
 
