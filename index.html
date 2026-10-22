@@ -1,1 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C言語 行番号つけ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
+  <header class="wrap app-header">
+    <h1>C言語ソース 行番号つけ</h1>
+    <p class="lead">
+      <strong>① コードを貼る</strong>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <strong>② 自動で行番号がつく</strong>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <strong>③ ボタンでコピー</strong>
+    </p>
+  </header>
+
+  <!-- 表示設定 -->
+  <section class="wrap toolbar" aria-label="表示設定">
+    <div class="tool">
+      <label for="startNumber">開始行番号</label>
+      <input type="number" id="startNumber" value="1" min="0" max="99999" step="1" inputmode="numeric">
+    </div>
+
+    <div class="tool">
+      <label for="tabWidth">タブ幅</label>
+      <select id="tabWidth">
+        <option value="2">2</option>
+        <option value="4" selected>4</option>
+        <option value="8">8</option>
+      </select>
+    </div>
+
+    <div class="tool">
+      <span class="tool-label">文字サイズ</span>
+      <div class="btn-group">
+        <button type="button" class="btn" id="fontDown" aria-label="文字を小さくする">A−</button>
+        <output id="fontSizeLabel" for="fontDown fontUp">18px</output>
+        <button type="button" class="btn" id="fontUp" aria-label="文字を大きくする">A＋</button>
+      </div>
+    </div>
+
+    <div class="tool">
+      <span class="tool-label">配色</span>
+      <div class="btn-group" role="group" aria-label="配色の切り替え">
+        <button type="button" class="btn seg-btn" id="themeLight" aria-pressed="true">☀ ライト</button>
+        <button type="button" class="btn seg-btn" id="themeDark" aria-pressed="false">🌙 ダーク</button>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+
+    <!-- ステップ1 -->
+    <section class="step" id="step1" aria-labelledby="step1-title">
+      <div class="step-head">
+        <span class="badge" aria-hidden="true">1</span>
+        <h2 id="step1-title">Cのソースプログラムを貼り付ける</h2>
+        <div class="step-actions">
+          <button type="button" class="btn" id="sampleBtn">サンプルを入れる</button>
+          <button type="button" class="btn" id="clearBtn">クリア</button>
+        </div>
+      </div>
+      <textarea id="source" rows="10" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"
+        placeholder="ここにCのソースプログラムを貼り付けてください（Ctrl+V / ⌘+V）"
+        aria-label="Cのソースプログラム入力欄"></textarea>
+    </section>
+
+    <div class="arrow" aria-hidden="true">▼ 貼り付けると自動で行番号がつきます</div>
+
+    <!-- ステップ2 -->
+    <section class="step is-empty" id="step2" aria-labelledby="step2-title">
+      <div class="step-head">
+        <span class="badge" aria-hidden="true">2</span>
+        <h2 id="step2-title">行番号つきで表示（自動）</h2>
+        <span class="line-count" id="lineCount"></span>
+      </div>
+      <div class="output" id="output" tabindex="0" aria-label="行番号つきのソースプログラム"></div>
+    </section>
+
+    <div class="arrow" aria-hidden="true">▼ ボタンを押してコピー</div>
+
+    <!-- ステップ3 -->
+    <section class="step is-empty" id="step3" aria-labelledby="step3-title">
+      <div class="step-head">
+        <span class="badge" aria-hidden="true">3</span>
+        <h2 id="step3-title">行番号つきのコードをコピーする</h2>
+      </div>
+      <div class="copy-row">
+        <button type="button" class="btn-copy" id="copyBtn" disabled>📋 行番号つきでコピー</button>
+        <span class="copy-status" id="copyStatus" role="status" aria-live="polite"></span>
+      </div>
+      <p class="hint">コピーした内容は、Word・PowerPoint・メモ帳などにそのまま貼り付けられます。</p>
+    </section>
+
+  </main>
+
+  <footer class="wrap footer">
+    🔒 貼り付けたコードは、お使いのブラウザの中だけで処理されます。サーバーには送信されません。
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

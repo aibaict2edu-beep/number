@@ -1,1 +1,309 @@
+/* ===== 配色（ライト：既定） ===== */
+:root {
+  color-scheme: light;
+  --code-size: 18px;
 
+  --bg: #f3f5f9;
+  --panel: #ffffff;
+  --text: #1c2430;
+  --muted: #5b6678;
+  --border: #d3d9e4;
+  --accent: #1f6feb;
+  --accent-soft: #e6efff;
+  --accent-text: #ffffff;
+  --ok: #2b8a3e;
+  --code-bg: #fbfcfe;
+  --hover: #eef3fb;
+  --ln: #8591a5;
+
+  --tok-keyword: #c2255c;
+  --tok-type: #7048e8;
+  --tok-string: #b36200;
+  --tok-number: #0c8599;
+  --tok-comment: #5c7f3b;
+  --tok-preproc: #d9480f;
+  --tok-func: #1971c2;
+
+  --mono: "Cascadia Mono", "SF Mono", Menlo, Consolas, "BIZ UDGothic", "MS Gothic", monospace;
+  --sans: "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ===== 配色（ダーク） ===== */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #10141a;
+  --panel: #1a202a;
+  --text: #e6eaf0;
+  --muted: #a3adbd;
+  --border: #323c4b;
+  --accent: #4c8dff;
+  --accent-soft: #223252;
+  --accent-text: #0b1220;
+  --ok: #51cf66;
+  --code-bg: #0d1117;
+  --hover: #172033;
+  --ln: #6f7b90;
+
+  --tok-keyword: #ff7aa8;
+  --tok-type: #b197fc;
+  --tok-string: #ffc078;
+  --tok-number: #66d9e8;
+  --tok-comment: #8fbf6a;
+  --tok-preproc: #ff9966;
+  --tok-func: #74c0fc;
+}
+
+/* ===== 基本 ===== */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.wrap {
+  max-width: 1100px;
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ===== ヘッダー ===== */
+.app-header { padding-top: 24px; padding-bottom: 8px; }
+
+.app-header h1 {
+  margin: 0 0 6px;
+  font-size: 1.7rem;
+  line-height: 1.3;
+}
+
+.lead {
+  margin: 0;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.lead strong { color: var(--text); }
+.flow-arrow { color: var(--accent); font-weight: 700; }
+
+/* ===== ボタン共通 ===== */
+.btn {
+  min-height: 42px;
+  padding: 6px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.btn:focus-visible,
+.btn-copy:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.output:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.seg-btn[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.seg-btn[aria-pressed="true"]:hover { background: var(--accent); }
+
+/* ===== 設定バー ===== */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: center;
+  margin-top: 12px;
+  margin-bottom: 20px;
+  padding-block: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: calc(1100px - 32px);
+}
+
+.tool { display: flex; align-items: center; gap: 8px; }
+.tool label, .tool-label { font-weight: 600; white-space: nowrap; }
+
+.tool input[type="number"],
+.tool select {
+  min-height: 42px;
+  padding: 4px 8px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.tool input[type="number"] { width: 6.5em; }
+
+.btn-group { display: inline-flex; align-items: center; gap: 6px; }
+
+#fontSizeLabel {
+  min-width: 4.2em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ===== ステップ ===== */
+.step {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  transition: opacity .2s, border-color .2s;
+}
+.step:not(.is-empty) { border-color: var(--accent); }
+.step.is-empty#step2,
+.step.is-empty#step3 { opacity: .6; }
+
+.step-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.step-head h2 { margin: 0; font-size: 1.2rem; line-height: 1.3; }
+.step-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.badge {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.line-count { margin-left: auto; color: var(--muted); font-weight: 600; }
+
+.arrow {
+  text-align: center;
+  padding: 8px 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ===== ステップ1：入力欄 ===== */
+#source {
+  display: block;
+  width: 100%;
+  min-height: 12em;
+  padding: 12px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: var(--code-size);
+  line-height: 1.5;
+  tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+  resize: vertical;
+}
+#source::placeholder { color: var(--muted); font-family: var(--sans); font-size: 1rem; }
+
+/* ===== ステップ2：表示 ===== */
+.output {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding-block: 12px;
+  max-height: 60vh;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: var(--code-size);
+  line-height: 1.5;
+}
+
+.line {
+  white-space: pre;
+  padding-inline: 12px;
+  min-width: max-content;
+}
+.line:hover { background: var(--hover); }
+.ln { color: var(--ln); }
+
+.placeholder {
+  padding: 20px 16px;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 1rem;
+  white-space: normal;
+}
+
+/* シンタックスハイライト */
+.tok-keyword { color: var(--tok-keyword); font-weight: 700; }
+.tok-type    { color: var(--tok-type); }
+.tok-string  { color: var(--tok-string); }
+.tok-number  { color: var(--tok-number); }
+.tok-comment { color: var(--tok-comment); font-style: italic; }
+.tok-preproc { color: var(--tok-preproc); }
+.tok-func    { color: var(--tok-func); }
+
+/* ===== ステップ3：コピー ===== */
+.copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.btn-copy {
+  min-height: 56px;
+  padding: 10px 28px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 0;
+  border-radius: 12px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background .15s, transform .05s;
+}
+.btn-copy:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-copy:active:not(:disabled) { transform: translateY(1px); }
+.btn-copy:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+.btn-copy.copied { background: var(--ok); }
+
+.copy-status { font-weight: 700; color: var(--ok); }
+.copy-status.error { color: var(--tok-keyword); }
+
+.hint { margin: 12px 0 0; color: var(--muted); font-size: .95rem; }
+
+/* ===== フッター ===== */
+.footer {
+  padding-top: 24px;
+  padding-bottom: 32px;
+  color: var(--muted);
+  font-size: .9rem;
+  text-align: center;
+}
+
+/* ===== 狭い画面 ===== */
+@media (max-width: 640px) {
+  .app-header h1 { font-size: 1.4rem; }
+  .step-actions, .line-count { margin-left: 0; }
+  .btn-copy { width: 100%; }
+}
