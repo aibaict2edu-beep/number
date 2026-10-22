@@ -263,16 +263,18 @@ textarea:focus-visible,
 .tok-func    { color: var(--tok-func); }
 
 /* ===== ステップ3：コピー ===== */
-.copy-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
+.copy-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px 24px;
 }
+.copy-option { display: flex; flex-direction: column; gap: 8px; }
+.copy-option .btn-copy { width: 100%; }
+.option-note { margin: 0; color: var(--muted); font-size: .95rem; }
 
 .btn-copy {
   min-height: 56px;
-  padding: 10px 28px;
+  padding: 10px 20px;
   background: var(--accent);
   color: var(--accent-text);
   border: 0;
@@ -287,7 +289,7 @@ textarea:focus-visible,
 .btn-copy:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
 .btn-copy.copied { background: var(--ok); }
 
-.copy-status { font-weight: 700; color: var(--ok); }
+.copy-status { display: block; min-height: 1.6em; margin-top: 12px; font-weight: 700; color: var(--ok); }
 .copy-status.error { color: var(--tok-keyword); }
 
 .hint { margin: 12px 0 0; color: var(--muted); font-size: .95rem; }

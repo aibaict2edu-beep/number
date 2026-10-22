@@ -8,6 +8,11 @@
   const FONT_STEP = 2;
   const FONT_DEFAULT = 18;
 
+  // 「色つきでコピー」で貼り付けた後の見た目（画面の文字サイズ設定とは無関係に固定）
+  const RICH_FONT_FAMILY = "Consolas, 'MS Gothic', 'BIZ UDGothic', monospace";
+  const RICH_FONT_PT = 11;
+  const RICH_LINE_HEIGHT = 1.35;
+
   const SAMPLE = String.raw`#include <stdio.h>
 
 /* 配列の合計と平均を求めるプログラム */
@@ -44,9 +49,11 @@ int main(void)
     fontLabel: $("fontSizeLabel"),
     themeLight: $("themeLight"),
     themeDark: $("themeDark"),
+    themeNote: $("themeNote"),
     sample: $("sampleBtn"),
     clear: $("clearBtn"),
-    copy: $("copyBtn"),
+    copyPlain: $("copyPlainBtn"),
+    copyRich: $("copyRichBtn"),
     copyStatus: $("copyStatus"),
     step2: $("step2"),
     step3: $("step3"),
@@ -70,6 +77,17 @@ int main(void)
   ]);
   const CONSTS = new Set(["NULL", "true", "false", "EOF"]);
 
+  // 色つきコピー用：トークン種別 → CSS変数名と装飾（色は現在の配色から読み取る）
+  const TOKEN_STYLE = {
+    "tok-keyword": { v: "--tok-keyword", bold: true },
+    "tok-type":    { v: "--tok-type" },
+    "tok-string":  { v: "--tok-string" },
+    "tok-number":  { v: "--tok-number" },
+    "tok-comment": { v: "--tok-comment", italic: true },
+    "tok-preproc": { v: "--tok-preproc" },
+    "tok-func":    { v: "--tok-func" },
+  };
+
   const TOKEN_RE = new RegExp([
     /\/\*[\s\S]*?(?:\*\/|(?![\s\S]))/.source,                                     // 1: ブロックコメント
     /\/\/[^\n]*/.source,                                                          // 2: 行コメント
@@ -85,16 +103,15 @@ int main(void)
   const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;" };
   const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ESC[c]);
 
-  // ソース全体を字句解析し、行ごとのHTMLに分割する（複数行コメントにも対応）
+  // ソース全体を字句解析し、行ごとのトークン配列 [{t: 文字列, c: クラス名}] に分割する
+  // （複数行コメントにも対応）
   function highlightToLines(text) {
-    const lines = [""];
+    const lines = [[]];
 
     const push = (str, cls) => {
       str.split("\n").forEach((part, i) => {
-        if (i > 0) lines.push("");
-        if (part === "") return;
-        const e = escapeHtml(part);
-        lines[lines.length - 1] += cls ? `<span class="${cls}">${e}</span>` : e;
+        if (i > 0) lines.push([]);
+        if (part !== "") lines[lines.length - 1].push({ t: part, c: cls });
       });
     };
 
@@ -128,8 +145,13 @@ int main(void)
     return lines;
   }
 
+  const tokenToHtml = (tk) => {
+    const e = escapeHtml(tk.t);
+    return tk.c ? `<span class="${tk.c}">${e}</span>` : e;
+  };
+
   /* ===== タブ展開（全角文字は幅2として数える） ===== */
-  const WIDE_RE = /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]/;
+  const WIDE_RE = /[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹯＀-｠￠-￦]/;
 
   function expandTabs(line, width) {
     if (line.indexOf("\t") === -1) return line;
@@ -149,7 +171,8 @@ int main(void)
   }
 
   /* ===== 変換・表示 ===== */
-  let copyPayload = "";
+  // state: 現在の変換結果（コピー時に使う）。空のときは null
+  let state = null;
 
   function getStartNumber() {
     const n = parseInt(els.start.value, 10);
@@ -157,87 +180,175 @@ int main(void)
     return Math.min(n, 99999);
   }
 
+  function setCopyEnabled(enabled) {
+    els.copyPlain.disabled = !enabled;
+    els.copyRich.disabled = !enabled;
+  }
+
   function render() {
     const raw = els.source.value.replace(/\r\n?/g, "\n").trimEnd();
     resetCopyFeedback();
 
     if (raw.trim() === "") {
-      copyPayload = "";
+      state = null;
       els.output.innerHTML =
         '<div class="placeholder">① にコードを貼り付けると、ここに行番号つきで自動表示されます。</div>';
       els.lineCount.textContent = "";
       els.step2.classList.add("is-empty");
       els.step3.classList.add("is-empty");
-      els.copy.disabled = true;
+      setCopyEnabled(false);
       return;
     }
 
     const tabWidth = parseInt(els.tab.value, 10) || 4;
     const plainLines = raw.split("\n").map((l) => expandTabs(l, tabWidth));
-    const htmlLines = highlightToLines(plainLines.join("\n"));
+    const tokenLines = highlightToLines(plainLines.join("\n"));
 
     const start = getStartNumber();
     const width = String(start + plainLines.length - 1).length;
-    const label = (i) => String(start + i).padStart(width, " ") + SEPARATOR;
+    const labels = plainLines.map((_, i) => String(start + i).padStart(width, " ") + SEPARATOR);
 
-    els.output.innerHTML = htmlLines
-      .map((h, i) => `<div class="line"><span class="ln">${label(i)}</span>${h}</div>`)
+    els.output.innerHTML = tokenLines
+      .map((tokens, i) =>
+        `<div class="line"><span class="ln">${labels[i]}</span>${tokens.map(tokenToHtml).join("")}</div>`)
       .join("");
 
-    copyPayload = plainLines.map((l, i) => (label(i) + l).trimEnd()).join("\n");
+    state = {
+      tokenLines,
+      labels,
+      plain: plainLines.map((l, i) => (labels[i] + l).trimEnd()).join("\n"),
+    };
 
     els.lineCount.textContent = `全 ${plainLines.length} 行`;
     els.step2.classList.remove("is-empty");
     els.step3.classList.remove("is-empty");
-    els.copy.disabled = false;
+    setCopyEnabled(true);
+  }
+
+  /* ===== 色つきコピー用HTMLの生成 =====
+     Word・PowerPoint等はCSS変数を解釈しないため、現在の配色の色を読み取って
+     インライン指定にする。1セルの表で囲むと、背景色が崩れにくい。 */
+  function buildRichHtml(tokenLines, labels) {
+    const cs = getComputedStyle(document.documentElement);
+    const css = (name) => cs.getPropertyValue(name).trim();
+    const bg = css("--code-bg");
+    const fg = css("--text");
+    const lnColor = css("--ln");
+    const border = css("--border");
+
+    const base = `font-family:${RICH_FONT_FAMILY};font-size:${RICH_FONT_PT}pt;line-height:${RICH_LINE_HEIGHT};`;
+    // 連続する空白が詰められないよう、空白は &nbsp; にする
+    const nb = (s) => escapeHtml(s).replace(/ /g, "&nbsp;");
+    const span = (text, color, extra) =>
+      `<span style="color:${color};${extra || ""}">${nb(text)}</span>`;
+
+    const paras = tokenLines.map((tokens, i) => {
+      let inner = span(labels[i], lnColor);
+      for (const tk of tokens) {
+        const st = TOKEN_STYLE[tk.c];
+        if (st) {
+          inner += span(tk.t, css(st.v),
+            (st.bold ? "font-weight:bold;" : "") + (st.italic ? "font-style:italic;" : ""));
+        } else {
+          inner += span(tk.t, fg);
+        }
+      }
+      return `<p style="margin:0;${base}color:${fg};">${inner}</p>`;
+    }).join("");
+
+    return '<meta charset="utf-8">' +
+      `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid ${border};">` +
+      `<tbody><tr><td bgcolor="${bg}" style="background-color:${bg};padding:8px 12px;">${paras}</td></tr></tbody></table>`;
   }
 
   /* ===== コピー ===== */
   let copyTimer = null;
-  const COPY_LABEL = "📋 行番号つきでコピー";
+  const PLAIN_LABEL = "📋 行番号つきでコピー（文字のみ）";
+  const RICH_LABEL = "🎨 行番号つきでコピー（色つき）";
 
   function resetCopyFeedback() {
     clearTimeout(copyTimer);
-    els.copy.classList.remove("copied");
-    els.copy.textContent = COPY_LABEL;
+    els.copyPlain.classList.remove("copied");
+    els.copyRich.classList.remove("copied");
+    els.copyPlain.textContent = PLAIN_LABEL;
+    els.copyRich.textContent = RICH_LABEL;
     els.copyStatus.textContent = "";
     els.copyStatus.classList.remove("error");
   }
 
-  async function writeClipboard(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch (e) { /* フォールバックへ */ }
-    }
+  // 古いブラウザ・http環境向け：copyイベントで文字と書式の両方を差し込む
+  function legacyCopy(plain, html) {
     const ta = document.createElement("textarea");
-    ta.value = text;
+    ta.value = plain;
     ta.setAttribute("readonly", "");
     ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
     document.body.appendChild(ta);
     ta.select();
+
+    let intercepted = false;
+    const onCopyEvent = (e) => {
+      if (!e.clipboardData) return;
+      e.clipboardData.setData("text/plain", plain);
+      if (html) e.clipboardData.setData("text/html", html);
+      e.preventDefault();
+      intercepted = true;
+    };
+    document.addEventListener("copy", onCopyEvent);
+
     let ok = false;
     try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.removeEventListener("copy", onCopyEvent);
     document.body.removeChild(ta);
-    return ok;
+
+    // 色つきを求められたのに書式を渡せなかった場合は失敗として扱う
+    return ok && (!html || intercepted);
   }
 
-  async function onCopy() {
-    if (!copyPayload) return;
-    const ok = await writeClipboard(copyPayload);
-    clearTimeout(copyTimer);
+  async function writeClipboard(plain, html) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        if (!html) {
+          await navigator.clipboard.writeText(plain);
+          return true;
+        }
+        if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/html": new Blob([html], { type: "text/html" }),
+              "text/plain": new Blob([plain], { type: "text/plain" }),
+            }),
+          ]);
+          return true;
+        }
+      } catch (e) { /* フォールバックへ */ }
+    }
+    return legacyCopy(plain, html);
+  }
+
+  async function onCopy(kind) {
+    if (!state) return;
+    const rich = kind === "rich";
+    // クリックの直後に同期的に作る（ブラウザのコピー許可のため）
+    const html = rich ? buildRichHtml(state.tokenLines, state.labels) : null;
+    const plain = state.plain;
+    const n = state.labels.length;
+
+    const ok = await writeClipboard(plain, html);
+    resetCopyFeedback();
+
     if (ok) {
-      const n = copyPayload.split("\n").length;
-      els.copy.classList.add("copied");
-      els.copy.textContent = "✔ コピーしました！";
-      els.copyStatus.classList.remove("error");
-      els.copyStatus.textContent = `${n}行をコピーしました。貼り付けてお使いください。`;
+      const btn = rich ? els.copyRich : els.copyPlain;
+      btn.classList.add("copied");
+      btn.textContent = "✔ コピーしました！";
+      els.copyStatus.textContent = rich
+        ? `${n}行を色つきでコピーしました。Word・PowerPointなどに貼り付けてください。`
+        : `${n}行を文字のみでコピーしました。`;
       copyTimer = setTimeout(resetCopyFeedback, 3000);
     } else {
       els.copyStatus.classList.add("error");
-      els.copyStatus.textContent =
-        "コピーできませんでした。②の表示を範囲選択して Ctrl+C（⌘+C）でコピーしてください。";
+      els.copyStatus.textContent = rich
+        ? "色つきでコピーできませんでした。「文字のみ」でコピーするか、②の表示を範囲選択して Ctrl+C（⌘+C）でコピーしてください。"
+        : "コピーできませんでした。②の表示を範囲選択して Ctrl+C（⌘+C）でコピーしてください。";
     }
   }
 
@@ -259,6 +370,7 @@ int main(void)
     document.documentElement.setAttribute("data-theme", t);
     els.themeLight.setAttribute("aria-pressed", String(t === "light"));
     els.themeDark.setAttribute("aria-pressed", String(t === "dark"));
+    els.themeNote.textContent = t === "dark" ? "ダーク：黒背景" : "ライト：白背景";
     store.set("lineno-theme", t);
   }
 
@@ -277,7 +389,8 @@ int main(void)
     els.source.focus();
   });
 
-  els.copy.addEventListener("click", onCopy);
+  els.copyPlain.addEventListener("click", () => onCopy("plain"));
+  els.copyRich.addEventListener("click", () => onCopy("rich"));
 
   els.fontDown.addEventListener("click", () => setFontSize(fontSize - FONT_STEP));
   els.fontUp.addEventListener("click", () => setFontSize(fontSize + FONT_STEP));

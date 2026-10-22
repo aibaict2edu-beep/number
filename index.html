@@ -82,7 +82,7 @@
       <div class="output" id="output" tabindex="0" aria-label="行番号つきのソースプログラム"></div>
     </section>
 
-    <div class="arrow" aria-hidden="true">▼ ボタンを押してコピー</div>
+    <div class="arrow" aria-hidden="true">▼ 用途に合わせてボタンを押してコピー</div>
 
     <!-- ステップ3 -->
     <section class="step is-empty" id="step3" aria-labelledby="step3-title">
@@ -90,11 +90,20 @@
         <span class="badge" aria-hidden="true">3</span>
         <h2 id="step3-title">行番号つきのコードをコピーする</h2>
       </div>
-      <div class="copy-row">
-        <button type="button" class="btn-copy" id="copyBtn" disabled>📋 行番号つきでコピー</button>
-        <span class="copy-status" id="copyStatus" role="status" aria-live="polite"></span>
+
+      <div class="copy-options">
+        <div class="copy-option">
+          <button type="button" class="btn-copy" id="copyPlainBtn" disabled>📋 行番号つきでコピー（文字のみ）</button>
+          <p class="option-note">メモ帳やプログラムの編集ソフト向け。文字だけがコピーされます。</p>
+        </div>
+        <div class="copy-option">
+          <button type="button" class="btn-copy" id="copyRichBtn" disabled>🎨 行番号つきでコピー（色つき）</button>
+          <p class="option-note">Word・PowerPoint・Google ドキュメントなど向け。いまの配色（<strong id="themeNote">ライト：白背景</strong>）の背景色と色分けのまま貼り付けられます。</p>
+        </div>
       </div>
-      <p class="hint">コピーした内容は、Word・PowerPoint・メモ帳などにそのまま貼り付けられます。</p>
+
+      <span class="copy-status" id="copyStatus" role="status" aria-live="polite"></span>
+      <p class="hint">色つきでコピーした場合、貼り付け後の文字は 11pt の等幅フォント（Consolas／MS ゴシック）で固定されます。画面の文字サイズ設定は影響しません。</p>
     </section>
 
   </main>
