@@ -57,7 +57,26 @@ int main(void)
     copyStatus: $("copyStatus"),
     step2: $("step2"),
     step3: $("step3"),
+    step4: $("step4"),
+    stdin: $("stdinText"),
+    echo: $("echoCheck"),
+    run: $("runBtn"),
+    result: $("result"),
+    copyResult: $("copyResultBtn"),
+    copyAll: $("copyAllBtn"),
+    copyStatus2: $("copyStatus2"),
   };
+
+  // ファイルの版が食い違っている（一部だけ古い）場合は、動かさずに案内を出す
+  const missing = Object.keys(els).filter((k) => !els[k]);
+  if (missing.length > 0) {
+    const bar = document.createElement("div");
+    bar.className = "version-banner";
+    bar.textContent = "ファイルの版が食い違っています。index.html・style.css・script.js・cinterp.js の4つをすべて最新に入れ替え、Ctrl+F5 で再読み込みしてください。";
+    document.body.insertBefore(bar, document.body.firstChild);
+    return;
+  }
+  const hasInterp = typeof globalThis.CInterp !== "undefined" && typeof globalThis.CInterp.run === "function";
 
   const store = {
     get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
@@ -183,11 +202,28 @@ int main(void)
   function setCopyEnabled(enabled) {
     els.copyPlain.disabled = !enabled;
     els.copyRich.disabled = !enabled;
+    els.run.disabled = !enabled || !hasInterp;
+    els.step4.classList.toggle("is-empty", !enabled);
+  }
+
+  const RESULT_PLACEHOLDER = '<div class="placeholder">「▶ 実行する」を押すと、ここに実行結果が表示されます。</div>';
+
+  function clearResult() {
+    lastRun = null;
+    els.result.innerHTML = hasInterp
+      ? RESULT_PLACEHOLDER
+      : '<div class="placeholder">cinterp.js が読み込めないため、実行機能は使えません。</div>';
+    els.copyResult.disabled = true;
+    els.copyAll.disabled = true;
+    resetCopyFeedback2();
+    const bad = els.output.querySelector(".line.err");
+    if (bad) bad.classList.remove("err");
   }
 
   function render() {
     const raw = els.source.value.replace(/\r\n?/g, "\n").trimEnd();
     resetCopyFeedback();
+    clearResult();
 
     if (raw.trim() === "") {
       state = null;
@@ -214,6 +250,8 @@ int main(void)
       .join("");
 
     state = {
+      source: plainLines.join("\n"),
+      start,
       tokenLines,
       labels,
       plain: plainLines.map((l, i) => (labels[i] + l).trimEnd()).join("\n"),
@@ -352,6 +390,127 @@ int main(void)
     }
   }
 
+  /* ===== ④ 実行 ===== */
+  let lastRun = null;       // { output, text }（コピー用）
+  let copyTimer2 = null;
+  const RES_BG = "#1e1e1e";
+  const RES_FG = "#f0f0f0";
+
+  function resetCopyFeedback2() {
+    clearTimeout(copyTimer2);
+    els.copyResult.classList.remove("copied");
+    els.copyAll.classList.remove("copied");
+    els.copyResult.textContent = "📋 実行結果だけコピー";
+    els.copyAll.textContent = "🎨 コードと実行結果をまとめてコピー";
+    els.copyStatus2.textContent = "";
+    els.copyStatus2.classList.remove("error");
+  }
+
+  function showResult(res) {
+    let html = "";
+    const err = res.error;
+    const out = res.output || "";
+
+    if (err && res.phase !== "run") {
+      html += `<div class="res-err"><strong>コンパイルエラー（実行できません）</strong>${
+        err.line ? escapeHtml(String(err.line)) + " 行目：" : ""}${escapeHtml(err.message)}</div>`;
+    } else {
+      html += out === ""
+        ? '<pre class="out muted">（出力はありません）</pre>'
+        : `<pre class="out">${escapeHtml(out)}</pre>`;
+      if (err) {
+        html += `<div class="res-err"><strong>実行中にエラー${err.line ? "（" + escapeHtml(String(err.line)) + " 行目）" : ""}</strong>${escapeHtml(err.message)}</div>`;
+      } else if (res.exitCode) {
+        html += `<div class="res-meta">プログラムは終了コード ${escapeHtml(String(res.exitCode))} で終了しました。</div>`;
+      }
+      if (res.eofHit && els.stdin.value.trim() === "") {
+        html += '<div class="res-note">入力欄が空でした。scanf などで値を読み込むプログラムは、上の入力欄に値を書いてから実行してください。</div>';
+      }
+    }
+    els.result.innerHTML = html;
+
+    if (err && err.line) {
+      const idx = err.line - state.start;
+      const row = els.output.querySelectorAll(".line")[idx];
+      if (row) {
+        row.classList.add("err");
+        row.scrollIntoView({ block: "nearest" });
+      }
+    }
+
+    const copyable = res.phase === "run" && out !== "";
+    lastRun = copyable ? { output: out } : null;
+    els.copyResult.disabled = !copyable;
+    els.copyAll.disabled = !copyable;
+  }
+
+  function runProgram() {
+    if (!state || !hasInterp) return;
+    clearResult();
+    els.run.disabled = true;
+    els.run.textContent = "実行中…";
+    const src = state.source;
+    const start = state.start;
+    setTimeout(() => {
+      let res;
+      try {
+        res = globalThis.CInterp.run(src, {
+          input: els.stdin.value,
+          lineOffset: start - 1,
+          timeLimitMs: 5000,
+          echoInput: els.echo.checked,
+          longSize: 4,
+        });
+      } catch (e) {
+        res = { output: "", exitCode: 1, phase: "run", error: { message: "内部エラーが起きました：" + (e && e.message ? e.message : e), line: 0 } };
+      }
+      showResult(res);
+      els.run.textContent = "▶ 実行する";
+      els.run.disabled = false;
+    }, 30);
+  }
+
+  const trimEndNl = (s) => s.replace(/\n+$/, "");
+
+  function resultTableHtml(output) {
+    const base = `font-family:${RICH_FONT_FAMILY};font-size:${RICH_FONT_PT}pt;line-height:${RICH_LINE_HEIGHT};`;
+    const nb = (s) => escapeHtml(s).replace(/ /g, "&nbsp;");
+    const paras = trimEndNl(output).split("\n").map((l) =>
+      `<p style="margin:0;${base}color:${RES_FG};"><span style="color:${RES_FG};">${l === "" ? "&nbsp;" : nb(l)}</span></p>`
+    ).join("");
+    return '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #000000;">' +
+      `<tbody><tr><td bgcolor="${RES_BG}" style="background-color:${RES_BG};padding:8px 12px;">${paras}</td></tr></tbody></table>`;
+  }
+
+  async function onCopyResult(kind) {
+    if (!state || !lastRun) return;
+    const all = kind === "all";
+    const out = lastRun.output;
+    let plain, html = null;
+    if (all) {
+      const codeHtml = buildRichHtml(state.tokenLines, state.labels).replace('<meta charset="utf-8">', "");
+      const labelP = `<p style="margin:0;font-family:${RICH_FONT_FAMILY};font-size:${RICH_FONT_PT}pt;font-weight:bold;">【実行結果】</p>`;
+      html = '<meta charset="utf-8">' + codeHtml + "<p>&nbsp;</p>" + labelP + resultTableHtml(out);
+      plain = state.plain + "\n\n【実行結果】\n" + trimEndNl(out);
+    } else {
+      plain = out;
+    }
+    const ok = await writeClipboard(plain, html);
+    resetCopyFeedback2();
+    if (ok) {
+      const btn = all ? els.copyAll : els.copyResult;
+      btn.classList.add("copied");
+      btn.textContent = "✔ コピーしました！";
+      els.copyStatus2.textContent = all
+        ? "コードと実行結果をコピーしました。Word に貼るときは貼り付けオプションで「元の書式を保持」を選んでください。"
+        : "実行結果をコピーしました。";
+      copyTimer2 = setTimeout(resetCopyFeedback2, 3000);
+    } else {
+      els.copyStatus2.classList.add("error");
+      els.copyStatus2.textContent = "コピーできませんでした。実行結果を範囲選択して Ctrl+C（⌘+C）でコピーしてください。";
+    }
+  }
+
   /* ===== 文字サイズ ===== */
   let fontSize = FONT_DEFAULT;
 
@@ -392,6 +551,11 @@ int main(void)
   els.copyPlain.addEventListener("click", () => onCopy("plain"));
   els.copyRich.addEventListener("click", () => onCopy("rich"));
 
+  els.run.addEventListener("click", runProgram);
+  els.copyResult.addEventListener("click", () => onCopyResult("result"));
+  els.copyAll.addEventListener("click", () => onCopyResult("all"));
+  els.echo.addEventListener("change", () => store.set("lineno-echo", els.echo.checked ? "1" : "0"));
+
   els.fontDown.addEventListener("click", () => setFontSize(fontSize - FONT_STEP));
   els.fontUp.addEventListener("click", () => setFontSize(fontSize + FONT_STEP));
 
@@ -402,5 +566,6 @@ int main(void)
   const savedFont = parseInt(store.get("lineno-font"), 10);
   setFontSize(Number.isFinite(savedFont) ? savedFont : FONT_DEFAULT);
   setTheme(store.get("lineno-theme") === "dark" ? "dark" : "light");
+  els.echo.checked = store.get("lineno-echo") !== "0";
   render();
 })();
